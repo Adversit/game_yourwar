@@ -1,0 +1,20 @@
+node_modules/
+.sites-runtime/
+qa/
+*.log
+
+# Exact runtime assets reconstructed automatically from versioned source fragments.
+/dist/assets/audio/battle.mp3
+/dist/assets/models/Barbarian.glb
+/dist/assets/models/Knight.glb
+/dist/assets/models/Mage.glb
+/dist/assets/models/Rogue_Hooded.glb
+/dist/assets/vendor/three.core.js
+/dist/assets/vendor/three.module.js
+
+# Local-only credentials, caches and diagnostics.
+.env*
+.aws/
+.codex/
+.agents/
+*.tsbuildinfo

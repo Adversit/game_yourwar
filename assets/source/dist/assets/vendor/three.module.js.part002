@@ -1,0 +1,1413 @@
+eVersion;
+
+			if ( materialProperties.needsLights ) {
+
+				// wire up the material to this renderer's lighting state
+
+				uniforms.ambientLightColor.value = lights.state.ambient;
+				uniforms.lightProbe.value = lights.state.probe;
+				uniforms.sunLights.value = lights.state.sun;
+				uniforms.sunLightShadows.value = lights.state.sunShadow;
+				uniforms.directionalLights.value = lights.state.directional;
+				uniforms.directionalLightShadows.value = lights.state.directionalShadow;
+				uniforms.spotLights.value = lights.state.spot;
+				uniforms.spotLightShadows.value = lights.state.spotShadow;
+				uniforms.rectAreaLights.value = lights.state.rectArea;
+				uniforms.ltc_1.value = lights.state.rectAreaLTC1;
+				uniforms.ltc_2.value = lights.state.rectAreaLTC2;
+				uniforms.pointLights.value = lights.state.point;
+				uniforms.pointLightShadows.value = lights.state.pointShadow;
+				uniforms.hemisphereLights.value = lights.state.hemi;
+
+				uniforms.sunShadowMatrix.value = lights.state.sunShadowMatrix;
+				uniforms.sunShadowCascade.value = lights.state.sunShadowCascade;
+				uniforms.directionalShadowMatrix.value = lights.state.directionalShadowMatrix;
+				uniforms.spotLightMatrix.value = lights.state.spotLightMatrix;
+				uniforms.spotLightMap.value = lights.state.spotLightMap;
+				uniforms.pointShadowMatrix.value = lights.state.pointShadowMatrix;
+				// TODO (abelnation): add area lights shadow info to uniforms
+
+			}
+
+			materialProperties.lightProbeGrid = currentRenderState.state.lightProbeGridArray.length > 0;
+
+			materialProperties.currentProgram = program;
+			materialProperties.uniformsList = null;
+
+			return program;
+
+		}
+
+		function getUniformList( materialProperties ) {
+
+			if ( materialProperties.uniformsList === null ) {
+
+				const progUniforms = materialProperties.currentProgram.getUniforms();
+				materialProperties.uniformsList = WebGLUniforms.seqWithValue( progUniforms.seq, materialProperties.uniforms );
+
+			}
+
+			return materialProperties.uniformsList;
+
+		}
+
+		function updateCommonMaterialProperties( material, parameters ) {
+
+			const materialProperties = properties.get( material );
+
+			materialProperties.outputColorSpace = parameters.outputColorSpace;
+			materialProperties.batching = parameters.batching;
+			materialProperties.batchingColor = parameters.batchingColor;
+			materialProperties.instancing = parameters.instancing;
+			materialProperties.instancingColor = parameters.instancingColor;
+			materialProperties.instancingMorph = parameters.instancingMorph;
+			materialProperties.skinning = parameters.skinning;
+			materialProperties.morphTargets = parameters.morphTargets;
+			materialProperties.morphNormals = parameters.morphNormals;
+			materialProperties.morphColors = parameters.morphColors;
+			materialProperties.morphTargetsCount = parameters.morphTargetsCount;
+			materialProperties.numClippingPlanes = parameters.numClippingPlanes;
+			materialProperties.numIntersection = parameters.numClipIntersection;
+			materialProperties.vertexAlphas = parameters.vertexAlphas;
+			materialProperties.vertexTangents = parameters.vertexTangents;
+			materialProperties.toneMapping = parameters.toneMapping;
+
+		}
+
+		function findLightProbeGrid( volumes, object ) {
+
+			if ( volumes.length === 0 ) return null;
+
+			if ( volumes.length === 1 ) {
+
+				return volumes[ 0 ].texture !== null ? volumes[ 0 ] : null;
+
+			}
+
+			objectPosition.setFromMatrixPosition( object.matrixWorld );
+
+			for ( let i = 0, l = volumes.length; i < l; i ++ ) {
+
+				const v = volumes[ i ];
+
+				if ( v.texture !== null && v.boundingBox.containsPoint( objectPosition ) ) return v;
+
+			}
+
+			return null;
+
+		}
+
+		function setProgram( camera, scene, geometry, material, object ) {
+
+			if ( scene.isScene !== true ) scene = _emptyScene; // scene could be a Mesh, Line, Points, ...
+
+			textures.resetTextureUnits();
+
+			const fog = scene.fog;
+			const environment = ( material.isMeshStandardMaterial || material.isMeshLambertMaterial || material.isMeshPhongMaterial ) ? scene.environment : null;
+			const colorSpace = ( _currentRenderTarget === null ) ? _this.outputColorSpace : ( _currentRenderTarget.isXRRenderTarget === true ? _currentRenderTarget.texture.colorSpace : ColorManagement.workingColorSpace );
+			const usePMREM = material.isMeshStandardMaterial || ( material.isMeshLambertMaterial && ! material.envMap ) || ( material.isMeshPhongMaterial && ! material.envMap );
+			const envMap = environments.get( material.envMap || environment, usePMREM );
+			const vertexAlphas = material.vertexColors === true && !! geometry.attributes.color && geometry.attributes.color.itemSize === 4;
+			const vertexTangents = !! geometry.attributes.tangent && ( !! material.normalMap || material.anisotropy > 0 );
+			const morphTargets = !! geometry.morphAttributes.position;
+			const morphNormals = !! geometry.morphAttributes.normal;
+			const morphColors = !! geometry.morphAttributes.color;
+
+			let toneMapping = NoToneMapping;
+
+			if ( material.toneMapped ) {
+
+				if ( _currentRenderTarget === null || _currentRenderTarget.isXRRenderTarget === true ) {
+
+					toneMapping = _this.toneMapping;
+
+				}
+
+			}
+
+			const morphAttribute = geometry.morphAttributes.position || geometry.morphAttributes.normal || geometry.morphAttributes.color;
+			const morphTargetsCount = ( morphAttribute !== undefined ) ? morphAttribute.length : 0;
+
+			const materialProperties = properties.get( material );
+			const lights = currentRenderState.state.lights;
+
+			if ( _clippingEnabled === true ) {
+
+				if ( _localClippingEnabled === true || camera !== _currentCamera ) {
+
+					const useCache =
+						camera === _currentCamera &&
+						material.id === _currentMaterialId;
+
+					// we might want to call this function with some ClippingGroup
+					// object instead of the material, once it becomes feasible
+					// (#8465, #8379)
+					clipping.setState( material, camera, useCache );
+
+				}
+
+			}
+
+			//
+
+			let needsProgramChange = false;
+
+			if ( material.version === materialProperties.__version ) {
+
+				if ( materialProperties.needsLights && ( materialProperties.lightsStateVersion !== lights.state.version ) ) {
+
+					needsProgramChange = true;
+
+				} else if ( materialProperties.outputColorSpace !== colorSpace ) {
+
+					needsProgramChange = true;
+
+				} else if ( object.isBatchedMesh && materialProperties.batching === false ) {
+
+					needsProgramChange = true;
+
+				} else if ( ! object.isBatchedMesh && materialProperties.batching === true ) {
+
+					needsProgramChange = true;
+
+				} else if ( object.isBatchedMesh && materialProperties.batchingColor === true && object._colorsTexture === null ) {
+
+					needsProgramChange = true;
+
+				} else if ( object.isBatchedMesh && materialProperties.batchingColor === false && object._colorsTexture !== null ) {
+
+					needsProgramChange = true;
+
+				} else if ( object.isInstancedMesh && materialProperties.instancing === false ) {
+
+					needsProgramChange = true;
+
+				} else if ( ! object.isInstancedMesh && materialProperties.instancing === true ) {
+
+					needsProgramChange = true;
+
+				} else if ( object.isSkinnedMesh && materialProperties.skinning === false ) {
+
+					needsProgramChange = true;
+
+				} else if ( ! object.isSkinnedMesh && materialProperties.skinning === true ) {
+
+					needsProgramChange = true;
+
+				} else if ( object.isInstancedMesh && materialProperties.instancingColor === true && object.instanceColor === null ) {
+
+					needsProgramChange = true;
+
+				} else if ( object.isInstancedMesh && materialProperties.instancingColor === false && object.instanceColor !== null ) {
+
+					needsProgramChange = true;
+
+				} else if ( object.isInstancedMesh && materialProperties.instancingMorph === true && object.morphTexture === null ) {
+
+					needsProgramChange = true;
+
+				} else if ( object.isInstancedMesh && materialProperties.instancingMorph === false && object.morphTexture !== null ) {
+
+					needsProgramChange = true;
+
+				} else if ( materialProperties.envMap !== envMap ) {
+
+					needsProgramChange = true;
+
+				} else if ( material.fog === true && materialProperties.fog !== fog ) {
+
+					needsProgramChange = true;
+
+				} else if ( materialProperties.numClippingPlanes !== undefined &&
+					( materialProperties.numClippingPlanes !== clipping.numPlanes ||
+					materialProperties.numIntersection !== clipping.numIntersection ) ) {
+
+					needsProgramChange = true;
+
+				} else if ( materialProperties.vertexAlphas !== vertexAlphas ) {
+
+					needsProgramChange = true;
+
+				} else if ( materialProperties.vertexTangents !== vertexTangents ) {
+
+					needsProgramChange = true;
+
+				} else if ( materialProperties.morphTargets !== morphTargets ) {
+
+					needsProgramChange = true;
+
+				} else if ( materialProperties.morphNormals !== morphNormals ) {
+
+					needsProgramChange = true;
+
+				} else if ( materialProperties.morphColors !== morphColors ) {
+
+					needsProgramChange = true;
+
+				} else if ( materialProperties.toneMapping !== toneMapping ) {
+
+					needsProgramChange = true;
+
+				} else if ( materialProperties.morphTargetsCount !== morphTargetsCount ) {
+
+					needsProgramChange = true;
+
+				} else if ( !! materialProperties.lightProbeGrid !== ( currentRenderState.state.lightProbeGridArray.length > 0 ) ) {
+
+					needsProgramChange = true;
+
+				}
+
+			} else {
+
+				needsProgramChange = true;
+				materialProperties.__version = material.version;
+
+			}
+
+			//
+
+			let program = materialProperties.currentProgram;
+
+			if ( needsProgramChange === true ) {
+
+				program = getProgram( material, scene, object );
+
+				// notify the node builder that the program has changed so uniforms and update nodes can
+				// be cached and triggered.
+				if ( _nodesHandler && material.isNodeMaterial ) {
+
+					_nodesHandler.onUpdateProgram( material, program, materialProperties );
+
+				}
+
+			}
+
+			let refreshProgram = false;
+			let refreshMaterial = false;
+			let refreshLights = false;
+
+			const p_uniforms = program.getUniforms(),
+				m_uniforms = materialProperties.uniforms;
+
+			if ( state.useProgram( program.program ) ) {
+
+				refreshProgram = true;
+				refreshMaterial = true;
+				refreshLights = true;
+
+			}
+
+			if ( material.id !== _currentMaterialId ) {
+
+				_currentMaterialId = material.id;
+
+				refreshMaterial = true;
+
+			}
+
+			if ( materialProperties.needsLights ) {
+
+				const objectVolume = findLightProbeGrid( currentRenderState.state.lightProbeGridArray, object );
+
+				if ( materialProperties.lightProbeGrid !== objectVolume ) {
+
+					materialProperties.lightProbeGrid = objectVolume;
+					refreshMaterial = true;
+
+				}
+
+			}
+
+			if ( refreshProgram || _currentCamera !== camera ) {
+
+				// common camera uniforms
+
+				const reversedDepthBuffer = state.buffers.depth.getReversed();
+
+				if ( reversedDepthBuffer && camera.reversedDepth !== true ) {
+
+					camera._reversedDepth = true;
+					camera.updateProjectionMatrix();
+
+				}
+
+				p_uniforms.setValue( _gl, 'projectionMatrix', camera.projectionMatrix );
+
+				p_uniforms.setValue( _gl, 'viewMatrix', camera.matrixWorldInverse );
+
+				const uCamPos = p_uniforms.map.cameraPosition;
+
+				if ( uCamPos !== undefined ) {
+
+					uCamPos.setValue( _gl, _vector3.setFromMatrixPosition( camera.matrixWorld ) );
+
+				}
+
+				if ( capabilities.logarithmicDepthBuffer ) {
+
+					p_uniforms.setValue( _gl, 'logDepthBufFC',
+						2.0 / ( Math.log( camera.far + 1.0 ) / Math.LN2 ) );
+
+				}
+
+				// consider moving isOrthographic to UniformLib and WebGLMaterials, see https://github.com/mrdoob/three.js/pull/26467#issuecomment-1645185067
+
+				if ( material.isMeshPhongMaterial ||
+					material.isMeshToonMaterial ||
+					material.isMeshLambertMaterial ||
+					material.isMeshBasicMaterial ||
+					material.isMeshStandardMaterial ||
+					material.isShaderMaterial ) {
+
+					p_uniforms.setValue( _gl, 'isOrthographic', camera.isOrthographicCamera === true );
+
+				}
+
+				if ( _currentCamera !== camera ) {
+
+					_currentCamera = camera;
+
+					// lighting uniforms depend on the camera so enforce an update
+					// now, in case this material supports lights - or later, when
+					// the next material that does gets activated:
+
+					refreshMaterial = true;		// set to true on material change
+					refreshLights = true;		// remains set until update done
+
+				}
+
+			}
+
+			// Pre-allocate texture units for shadow samplers before setting data textures
+			if ( materialProperties.needsLights ) {
+
+				// Set shadow map uniforms first to ensure they get the first texture units
+				if ( lights.state.sunShadowMap.length > 0 ) {
+
+					p_uniforms.setValue( _gl, 'sunShadowMap', lights.state.sunShadowMap, textures );
+
+				}
+
+				if ( lights.state.directionalShadowMap.length > 0 ) {
+
+					p_uniforms.setValue( _gl, 'directionalShadowMap', lights.state.directionalShadowMap, textures );
+
+				}
+
+				if ( lights.state.spotShadowMap.length > 0 ) {
+
+					p_uniforms.setValue( _gl, 'spotShadowMap', lights.state.spotShadowMap, textures );
+
+				}
+
+				if ( lights.state.pointShadowMap.length > 0 ) {
+
+					p_uniforms.setValue( _gl, 'pointShadowMap', lights.state.pointShadowMap, textures );
+
+				}
+
+			}
+
+			// skinning and morph target uniforms must be set even if material didn't change
+			// auto-setting of texture unit for bone and morph texture must go before other textures
+			// otherwise textures used for skinning and morphing can take over texture units reserved for other material textures
+
+			if ( object.isSkinnedMesh ) {
+
+				p_uniforms.setOptional( _gl, object, 'bindMatrix' );
+				p_uniforms.setOptional( _gl, object, 'bindMatrixInverse' );
+
+				const skeleton = object.skeleton;
+
+				if ( skeleton ) {
+
+					if ( skeleton.boneTexture === null ) skeleton.computeBoneTexture();
+
+					p_uniforms.setValue( _gl, 'boneTexture', skeleton.boneTexture, textures );
+
+				}
+
+			}
+
+			if ( object.isBatchedMesh ) {
+
+				p_uniforms.setOptional( _gl, object, 'batchingTexture' );
+				p_uniforms.setValue( _gl, 'batchingTexture', object._matricesTexture, textures );
+
+				p_uniforms.setOptional( _gl, object, 'batchingIdTexture' );
+				p_uniforms.setValue( _gl, 'batchingIdTexture', object._indirectTexture, textures );
+
+				p_uniforms.setOptional( _gl, object, 'batchingColorTexture' );
+				if ( object._colorsTexture !== null ) {
+
+					p_uniforms.setValue( _gl, 'batchingColorTexture', object._colorsTexture, textures );
+
+				}
+
+			}
+
+			const morphAttributes = geometry.morphAttributes;
+
+			if ( morphAttributes.position !== undefined || morphAttributes.normal !== undefined || ( morphAttributes.color !== undefined ) ) {
+
+				morphtargets.update( object, geometry, program );
+
+			}
+
+			if ( refreshMaterial || materialProperties.receiveShadow !== object.receiveShadow ) {
+
+				materialProperties.receiveShadow = object.receiveShadow;
+				p_uniforms.setValue( _gl, 'receiveShadow', object.receiveShadow );
+
+			}
+
+			if ( ( material.isMeshStandardMaterial || material.isMeshLambertMaterial || material.isMeshPhongMaterial ) && material.envMap === null && scene.environment !== null ) {
+
+				m_uniforms.envMapIntensity.value = scene.environmentIntensity;
+
+			}
+
+			// Set DFG LUT for physically-based materials
+			if ( m_uniforms.dfgLUT !== undefined ) {
+
+				m_uniforms.dfgLUT.value = getDFGLUT();
+
+			}
+
+			if ( refreshMaterial ) {
+
+				p_uniforms.setValue( _gl, 'toneMappingExposure', _this.toneMappingExposure );
+
+				if ( materialProperties.needsLights ) {
+
+					// the current material requires lighting info
+
+					// note: all lighting uniforms are always set correctly
+					// they simply reference the renderer's state for their
+					// values
+					//
+					// use the current material's .needsUpdate flags to set
+					// the GL state when required
+
+					markUniformsLightsNeedsUpdate( m_uniforms, refreshLights );
+
+				}
+
+				// refresh uniforms common to several materials
+
+				if ( fog && material.fog === true ) {
+
+					materials.refreshFogUniforms( m_uniforms, fog );
+
+				}
+
+				materials.refreshMaterialUniforms( m_uniforms, material, _pixelRatio, _height, currentRenderState.state.transmissionRenderTarget[ camera.id ] );
+
+				// light probe volume
+
+				if ( materialProperties.needsLights && materialProperties.lightProbeGrid ) {
+
+					const volume = materialProperties.lightProbeGrid;
+
+					m_uniforms.probesSH.value = volume.texture;
+					m_uniforms.probesMin.value.copy( volume.boundingBox.min );
+					m_uniforms.probesMax.value.copy( volume.boundingBox.max );
+					m_uniforms.probesResolution.value.copy( volume.resolution );
+
+				}
+
+				WebGLUniforms.upload( _gl, getUniformList( materialProperties ), m_uniforms, textures );
+
+			}
+
+			if ( material.isShaderMaterial && material.uniformsNeedUpdate === true ) {
+
+				WebGLUniforms.upload( _gl, getUniformList( materialProperties ), m_uniforms, textures );
+				material.uniformsNeedUpdate = false;
+
+			}
+
+			if ( material.isSpriteMaterial ) {
+
+				p_uniforms.setValue( _gl, 'center', object.center );
+
+			}
+
+			// common matrices
+
+			p_uniforms.setValue( _gl, 'modelViewMatrix', object.modelViewMatrix );
+			p_uniforms.setValue( _gl, 'normalMatrix', object.normalMatrix );
+			p_uniforms.setValue( _gl, 'modelMatrix', object.matrixWorld );
+
+			// UBOs
+
+			if ( material.uniformsGroups !== undefined ) {
+
+				const groups = material.uniformsGroups;
+
+				for ( let i = 0, l = groups.length; i < l; i ++ ) {
+
+					const group = groups[ i ];
+
+					uniformsGroups.update( group, program );
+					uniformsGroups.bind( group, program );
+
+				}
+
+			}
+
+			return program;
+
+		}
+
+		// If uniforms are marked as clean, they don't need to be loaded to the GPU.
+
+		function markUniformsLightsNeedsUpdate( uniforms, value ) {
+
+			uniforms.ambientLightColor.needsUpdate = value;
+			uniforms.lightProbe.needsUpdate = value;
+
+			uniforms.sunLights.needsUpdate = value;
+			uniforms.sunLightShadows.needsUpdate = value;
+			uniforms.directionalLights.needsUpdate = value;
+			uniforms.directionalLightShadows.needsUpdate = value;
+			uniforms.pointLights.needsUpdate = value;
+			uniforms.pointLightShadows.needsUpdate = value;
+			uniforms.spotLights.needsUpdate = value;
+			uniforms.spotLightShadows.needsUpdate = value;
+			uniforms.rectAreaLights.needsUpdate = value;
+			uniforms.hemisphereLights.needsUpdate = value;
+
+		}
+
+		function materialNeedsLights( material ) {
+
+			return material.isMeshLambertMaterial || material.isMeshToonMaterial || material.isMeshPhongMaterial ||
+				material.isMeshStandardMaterial || material.isShadowMaterial ||
+				( material.isShaderMaterial && material.lights === true );
+
+		}
+
+		/**
+		 * Returns the active cube face.
+		 *
+		 * @return {number} The active cube face.
+		 */
+		this.getActiveCubeFace = function () {
+
+			return _currentActiveCubeFace;
+
+		};
+
+		/**
+		 * Returns the active mipmap level.
+		 *
+		 * @return {number} The active mipmap level.
+		 */
+		this.getActiveMipmapLevel = function () {
+
+			return _currentActiveMipmapLevel;
+
+		};
+
+		/**
+		 * Returns the active render target.
+		 *
+		 * @return {?WebGLRenderTarget} The active render target. Returns `null` if no render target
+		 * is currently set.
+		 */
+		this.getRenderTarget = function () {
+
+			return _currentRenderTarget;
+
+		};
+
+		this.setRenderTargetTextures = function ( renderTarget, colorTexture, depthTexture ) {
+
+			const renderTargetProperties = properties.get( renderTarget );
+
+			renderTargetProperties.__autoAllocateDepthBuffer = renderTarget.resolveDepthBuffer === false;
+			if ( renderTargetProperties.__autoAllocateDepthBuffer === false ) {
+
+				// The multisample_render_to_texture extension doesn't work properly if there
+				// are midframe flushes and an external depth buffer. Disable use of the extension.
+				renderTargetProperties.__useRenderToTexture = false;
+
+			}
+
+			properties.get( renderTarget.texture ).__webglTexture = colorTexture;
+			properties.get( renderTarget.depthTexture ).__webglTexture = renderTargetProperties.__autoAllocateDepthBuffer ? undefined : depthTexture;
+
+			renderTargetProperties.__hasExternalTextures = true;
+
+		};
+
+		this.setRenderTargetFramebuffer = function ( renderTarget, defaultFramebuffer ) {
+
+			const renderTargetProperties = properties.get( renderTarget );
+			renderTargetProperties.__webglFramebuffer = defaultFramebuffer;
+			renderTargetProperties.__useDefaultFramebuffer = defaultFramebuffer === undefined;
+
+		};
+
+		/**
+		 * Sets the active rendertarget.
+		 *
+		 * @param {?WebGLRenderTarget} renderTarget - The render target to set. When `null` is given,
+		 * the canvas is set as the active render target instead.
+		 * @param {number} [activeCubeFace=0] - The active cube face when using a cube render target.
+		 * Indicates the z layer to render in to when using 3D or array render targets.
+		 * @param {number} [activeMipmapLevel=0] - The active mipmap level.
+		 */
+		this.setRenderTarget = function ( renderTarget, activeCubeFace = 0, activeMipmapLevel = 0 ) {
+
+			_currentRenderTarget = renderTarget;
+			_currentActiveCubeFace = activeCubeFace;
+			_currentActiveMipmapLevel = activeMipmapLevel;
+
+			let framebuffer = null;
+			let isCube = false;
+			let isRenderTarget3D = false;
+
+			if ( renderTarget ) {
+
+				const renderTargetProperties = properties.get( renderTarget );
+
+				if ( renderTargetProperties.__useDefaultFramebuffer !== undefined ) {
+
+					// Externally-managed framebuffer (e.g. XR)
+					// Bind to the stored framebuffer (may be null for default, or a WebGLFramebuffer)
+					state.bindFramebuffer( _gl.FRAMEBUFFER, renderTargetProperties.__webglFramebuffer );
+
+					_currentViewport.copy( renderTarget.viewport );
+					_currentScissor.copy( renderTarget.scissor );
+					_currentScissorTest = renderTarget.scissorTest;
+
+					state.viewport( _currentViewport );
+					state.scissor( _currentScissor );
+					state.setScissorTest( _currentScissorTest );
+
+					_currentMaterialId = -1;
+
+					return;
+
+				} else if ( renderTargetProperties.__webglFramebuffer === undefined ) {
+
+					textures.setupRenderTarget( renderTarget );
+
+				} else if ( renderTargetProperties.__hasExternalTextures ) {
+
+					// Color and depth texture must be rebound in order for the swapchain to update.
+					textures.rebindTextures( renderTarget, properties.get( renderTarget.texture ).__webglTexture, properties.get( renderTarget.depthTexture ).__webglTexture );
+
+				} else if ( renderTarget.depthBuffer ) {
+
+					// check if the depth texture is already bound to the frame buffer and that it's been initialized
+					const depthTexture = renderTarget.depthTexture;
+					if ( renderTargetProperties.__boundDepthTexture !== depthTexture ) {
+
+						// check if the depth texture is compatible
+						if (
+							depthTexture !== null &&
+							properties.has( depthTexture ) &&
+							( renderTarget.width !== depthTexture.image.width || renderTarget.height !== depthTexture.image.height )
+						) {
+
+							throw new Error( 'THREE.WebGLRenderer: Attached DepthTexture is initialized to the incorrect size.' );
+
+						}
+
+						// Swap the depth buffer to the currently attached one
+						textures.setupDepthRenderbuffer( renderTarget );
+
+					}
+
+				}
+
+				const texture = renderTarget.texture;
+
+				if ( texture.isData3DTexture || texture.isDataArrayTexture || texture.isCompressedArrayTexture ) {
+
+					isRenderTarget3D = true;
+
+				}
+
+				const __webglFramebuffer = properties.get( renderTarget ).__webglFramebuffer;
+
+				if ( renderTarget.isWebGLCubeRenderTarget ) {
+
+					if ( Array.isArray( __webglFramebuffer[ activeCubeFace ] ) ) {
+
+						framebuffer = __webglFramebuffer[ activeCubeFace ][ activeMipmapLevel ];
+
+					} else {
+
+						framebuffer = __webglFramebuffer[ activeCubeFace ];
+
+					}
+
+					isCube = true;
+
+				} else if ( ( renderTarget.samples > 0 ) && textures.useMultisampledRTT( renderTarget ) === false ) {
+
+					framebuffer = properties.get( renderTarget ).__webglMultisampledFramebuffer;
+
+				} else {
+
+					if ( Array.isArray( __webglFramebuffer ) ) {
+
+						framebuffer = __webglFramebuffer[ activeMipmapLevel ];
+
+					} else {
+
+						framebuffer = __webglFramebuffer;
+
+					}
+
+				}
+
+				_currentViewport.copy( renderTarget.viewport );
+				_currentScissor.copy( renderTarget.scissor );
+				_currentScissorTest = renderTarget.scissorTest;
+
+			} else {
+
+				_currentViewport.copy( _viewport ).multiplyScalar( _pixelRatio ).floor();
+				_currentScissor.copy( _scissor ).multiplyScalar( _pixelRatio ).floor();
+				_currentScissorTest = _scissorTest;
+
+			}
+
+			// Use a scratch frame buffer if rendering to a mip level to avoid depth buffers
+			// being bound that are different sizes.
+			if ( activeMipmapLevel !== 0 ) {
+
+				framebuffer = _scratchFramebuffer;
+
+			}
+
+			const framebufferBound = state.bindFramebuffer( _gl.FRAMEBUFFER, framebuffer );
+
+			if ( framebufferBound ) {
+
+				state.drawBuffers( renderTarget, framebuffer );
+
+			}
+
+			state.viewport( _currentViewport );
+			state.scissor( _currentScissor );
+			state.setScissorTest( _currentScissorTest );
+
+			if ( isCube ) {
+
+				const textureProperties = properties.get( renderTarget.texture );
+				_gl.framebufferTexture2D( _gl.FRAMEBUFFER, _gl.COLOR_ATTACHMENT0, _gl.TEXTURE_CUBE_MAP_POSITIVE_X + activeCubeFace, textureProperties.__webglTexture, activeMipmapLevel );
+
+			} else if ( isRenderTarget3D ) {
+
+				const layer = activeCubeFace;
+
+				for ( let i = 0; i < renderTarget.textures.length; i ++ ) {
+
+					const textureProperties = properties.get( renderTarget.textures[ i ] );
+
+					_gl.framebufferTextureLayer( _gl.FRAMEBUFFER, _gl.COLOR_ATTACHMENT0 + i, textureProperties.__webglTexture, activeMipmapLevel, layer );
+
+				}
+
+			} else if ( renderTarget !== null && activeMipmapLevel !== 0 ) {
+
+				// Only bind the frame buffer if we are using a scratch frame buffer to render to a mipmap.
+				// If we rebind the texture when using a multi sample buffer then an error about inconsistent samples will be thrown.
+				const textureProperties = properties.get( renderTarget.texture );
+				_gl.framebufferTexture2D( _gl.FRAMEBUFFER, _gl.COLOR_ATTACHMENT0, _gl.TEXTURE_2D, textureProperties.__webglTexture, activeMipmapLevel );
+
+			}
+
+			_currentMaterialId = -1; // reset current material to ensure correct uniform bindings
+
+		};
+
+		function getReadableState( texture ) {
+
+			const textureProperties = properties.get( texture );
+
+			if ( textureProperties.__readFormat !== texture.format || textureProperties.__readType !== texture.type ) {
+
+				textureProperties.__readFormat = texture.format;
+				textureProperties.__readType = texture.type;
+				textureProperties.__formatReadable = capabilities.textureFormatReadable( texture.format );
+				textureProperties.__typeReadable = capabilities.textureTypeReadable( texture.type );
+
+			}
+
+			return textureProperties;
+
+		}
+
+		/**
+		 * Reads the pixel data from the given render target into the given buffer.
+		 *
+		 * @param {WebGLRenderTarget} renderTarget - The render target to read from.
+		 * @param {number} x - The `x` coordinate of the copy region's origin.
+		 * @param {number} y - The `y` coordinate of the copy region's origin.
+		 * @param {number} width - The width of the copy region.
+		 * @param {number} height - The height of the copy region.
+		 * @param {TypedArray} buffer - The result buffer.
+		 * @param {number} [activeCubeFaceIndex] - The active cube face index.
+		 * @param {number} [textureIndex=0] - The texture index of an MRT render target.
+		 */
+		this.readRenderTargetPixels = function ( renderTarget, x, y, width, height, buffer, activeCubeFaceIndex, textureIndex = 0 ) {
+
+			if ( ! ( renderTarget && renderTarget.isWebGLRenderTarget ) ) {
+
+				error( 'WebGLRenderer.readRenderTargetPixels: renderTarget is not THREE.WebGLRenderTarget.' );
+				return;
+
+			}
+
+			let framebuffer = properties.get( renderTarget ).__webglFramebuffer;
+
+			if ( renderTarget.isWebGLCubeRenderTarget && activeCubeFaceIndex !== undefined ) {
+
+				framebuffer = framebuffer[ activeCubeFaceIndex ];
+
+			}
+
+			if ( framebuffer ) {
+
+				state.bindFramebuffer( _gl.FRAMEBUFFER, framebuffer );
+
+				try {
+
+					const texture = renderTarget.textures[ textureIndex ];
+					const textureFormat = texture.format;
+					const textureType = texture.type;
+
+					// when using MRT, select the correct color buffer for the subsequent read command
+
+					if ( renderTarget.textures.length > 1 ) _gl.readBuffer( _gl.COLOR_ATTACHMENT0 + textureIndex );
+
+					const readableState = getReadableState( texture );
+
+					if ( readableState.__formatReadable === false ) {
+
+						error( 'WebGLRenderer.readRenderTargetPixels: renderTarget is not in RGBA or implementation defined format.' );
+						return;
+
+					}
+
+					if ( readableState.__typeReadable === false ) {
+
+						error( 'WebGLRenderer.readRenderTargetPixels: renderTarget is not in UnsignedByteType or implementation defined type.' );
+						return;
+
+					}
+
+					// the following if statement ensures valid read requests (no out-of-bounds pixels, see #8604)
+
+					if ( ( x >= 0 && x <= ( renderTarget.width - width ) ) && ( y >= 0 && y <= ( renderTarget.height - height ) ) ) {
+
+						_gl.readPixels( x, y, width, height, utils.convert( textureFormat ), utils.convert( textureType ), buffer );
+
+					}
+
+				} finally {
+
+					// restore framebuffer of current render target if necessary
+
+					const framebuffer = ( _currentRenderTarget !== null ) ? properties.get( _currentRenderTarget ).__webglFramebuffer : null;
+					state.bindFramebuffer( _gl.FRAMEBUFFER, framebuffer );
+
+				}
+
+			}
+
+		};
+
+		/**
+		 * Asynchronous, non-blocking version of {@link WebGLRenderer#readRenderTargetPixels}.
+		 *
+		 * It is recommended to use this version of `readRenderTargetPixels()` whenever possible.
+		 *
+		 * @async
+		 * @param {WebGLRenderTarget} renderTarget - The render target to read from.
+		 * @param {number} x - The `x` coordinate of the copy region's origin.
+		 * @param {number} y - The `y` coordinate of the copy region's origin.
+		 * @param {number} width - The width of the copy region.
+		 * @param {number} height - The height of the copy region.
+		 * @param {TypedArray} buffer - The result buffer.
+		 * @param {number} [activeCubeFaceIndex] - The active cube face index.
+		 * @param {number} [textureIndex=0] - The texture index of an MRT render target.
+		 * @return {Promise<TypedArray>} A Promise that resolves when the read has been finished. The resolve provides the read data as a typed array.
+		 */
+		this.readRenderTargetPixelsAsync = async function ( renderTarget, x, y, width, height, buffer, activeCubeFaceIndex, textureIndex = 0 ) {
+
+			if ( ! ( renderTarget && renderTarget.isWebGLRenderTarget ) ) {
+
+				throw new Error( 'THREE.WebGLRenderer.readRenderTargetPixels: renderTarget is not THREE.WebGLRenderTarget.' );
+
+			}
+
+			let framebuffer = properties.get( renderTarget ).__webglFramebuffer;
+			if ( renderTarget.isWebGLCubeRenderTarget && activeCubeFaceIndex !== undefined ) {
+
+				framebuffer = framebuffer[ activeCubeFaceIndex ];
+
+			}
+
+			if ( framebuffer ) {
+
+				// the following if statement ensures valid read requests (no out-of-bounds pixels, see #8604)
+				if ( ( x >= 0 && x <= ( renderTarget.width - width ) ) && ( y >= 0 && y <= ( renderTarget.height - height ) ) ) {
+
+					// set the active frame buffer to the one we want to read
+					state.bindFramebuffer( _gl.FRAMEBUFFER, framebuffer );
+
+					const texture = renderTarget.textures[ textureIndex ];
+					const textureFormat = texture.format;
+					const textureType = texture.type;
+
+					// when using MRT, select the correct color buffer for the subsequent read command
+
+					if ( renderTarget.textures.length > 1 ) _gl.readBuffer( _gl.COLOR_ATTACHMENT0 + textureIndex );
+
+					const readableState = getReadableState( texture );
+
+					if ( readableState.__formatReadable === false ) {
+
+						throw new Error( 'THREE.WebGLRenderer.readRenderTargetPixelsAsync: renderTarget is not in RGBA or implementation defined format.' );
+
+					}
+
+					if ( readableState.__typeReadable === false ) {
+
+						throw new Error( 'THREE.WebGLRenderer.readRenderTargetPixelsAsync: renderTarget is not in UnsignedByteType or implementation defined type.' );
+
+					}
+
+					const glBuffer = _gl.createBuffer();
+					_gl.bindBuffer( _gl.PIXEL_PACK_BUFFER, glBuffer );
+					_gl.bufferData( _gl.PIXEL_PACK_BUFFER, buffer.byteLength, _gl.STREAM_READ );
+
+					_gl.readPixels( x, y, width, height, utils.convert( textureFormat ), utils.convert( textureType ), 0 );
+					_gl.bindBuffer( _gl.PIXEL_PACK_BUFFER, null );
+
+					// reset the frame buffer to the currently set buffer before waiting
+					const currFramebuffer = _currentRenderTarget !== null ? properties.get( _currentRenderTarget ).__webglFramebuffer : null;
+					state.bindFramebuffer( _gl.FRAMEBUFFER, currFramebuffer );
+
+					// check if the commands have finished every 8 ms
+					const sync = _gl.fenceSync( _gl.SYNC_GPU_COMMANDS_COMPLETE, 0 );
+
+					_gl.flush();
+
+					await probeAsync( _gl, sync, 4 );
+
+					// read the data and delete the buffer
+					_gl.bindBuffer( _gl.PIXEL_PACK_BUFFER, glBuffer );
+					_gl.getBufferSubData( _gl.PIXEL_PACK_BUFFER, 0, buffer );
+					_gl.bindBuffer( _gl.PIXEL_PACK_BUFFER, null );
+					_gl.deleteBuffer( glBuffer );
+					_gl.deleteSync( sync );
+
+					return buffer;
+
+				} else {
+
+					throw new Error( 'THREE.WebGLRenderer.readRenderTargetPixelsAsync: requested read bounds are out of range.' );
+
+				}
+
+			}
+
+		};
+
+		/**
+		 * Copies pixels from the current bound framebuffer into the given texture.
+		 *
+		 * @param {FramebufferTexture} texture - The texture.
+		 * @param {?Vector2} [position=null] - The start position of the copy operation.
+		 * @param {number} [level=0] - The mip level. The default represents the base mip.
+		 */
+		this.copyFramebufferToTexture = function ( texture, position = null, level = 0 ) {
+
+			const levelScale = Math.pow( 2, - level );
+			const width = Math.floor( texture.image.width * levelScale );
+			const height = Math.floor( texture.image.height * levelScale );
+
+			const x = position !== null ? position.x : 0;
+			const y = position !== null ? position.y : 0;
+
+			textures.setTexture2D( texture, 0 );
+
+			_gl.copyTexSubImage2D( _gl.TEXTURE_2D, level, 0, 0, x, y, width, height );
+
+			state.unbindTexture();
+
+		};
+
+
+		/**
+		 * Copies data of the given source texture into a destination texture.
+		 *
+		 * When using render target textures as `srcTexture` and `dstTexture`, you must make sure both render targets are initialized
+		 * {@link WebGLRenderer#initRenderTarget}.
+		 *
+		 * @param {Texture} srcTexture - The source texture.
+		 * @param {Texture} dstTexture - The destination texture.
+		 * @param {?(Box2|Box3)} [srcRegion=null] - A bounding box which describes the source region. Can be two or three-dimensional.
+		 * @param {?(Vector2|Vector3)} [dstPosition=null] - A vector that represents the origin of the destination region. Can be two or three-dimensional.
+		 * @param {number} [srcLevel=0] - The source mipmap level to copy.
+		 * @param {?number} [dstLevel=0] - The destination mipmap level.
+		 */
+		this.copyTextureToTexture = function ( srcTexture, dstTexture, srcRegion = null, dstPosition = null, srcLevel = 0, dstLevel = 0 ) {
+
+			// gather the necessary dimensions to copy
+			let width, height, depth, minX, minY, minZ;
+			let dstX, dstY, dstZ;
+			const image = srcTexture.isCompressedTexture ? srcTexture.mipmaps[ dstLevel ] : srcTexture.image;
+			if ( srcRegion !== null ) {
+
+				width = srcRegion.max.x - srcRegion.min.x;
+				height = srcRegion.max.y - srcRegion.min.y;
+				depth = srcRegion.isBox3 ? srcRegion.max.z - srcRegion.min.z : 1;
+				minX = srcRegion.min.x;
+				minY = srcRegion.min.y;
+				minZ = srcRegion.isBox3 ? srcRegion.min.z : 0;
+
+			} else {
+
+				const levelScale = Math.pow( 2, - srcLevel );
+				width = Math.floor( image.width * levelScale );
+				height = Math.floor( image.height * levelScale );
+				if ( srcTexture.isDataArrayTexture ) {
+
+					depth = image.depth;
+
+				} else if ( srcTexture.isData3DTexture ) {
+
+					depth = Math.floor( image.depth * levelScale );
+
+				} else {
+
+					depth = 1;
+
+				}
+
+				minX = 0;
+				minY = 0;
+				minZ = 0;
+
+			}
+
+			if ( dstPosition !== null ) {
+
+				dstX = dstPosition.x;
+				dstY = dstPosition.y;
+				dstZ = dstPosition.z;
+
+			} else {
+
+				dstX = 0;
+				dstY = 0;
+				dstZ = 0;
+
+			}
+
+			// Set up the destination target
+			const glFormat = utils.convert( dstTexture.format );
+			const glType = utils.convert( dstTexture.type );
+			let glTarget;
+
+			if ( dstTexture.isData3DTexture ) {
+
+				textures.setTexture3D( dstTexture, 0 );
+				glTarget = _gl.TEXTURE_3D;
+
+			} else if ( dstTexture.isDataArrayTexture || dstTexture.isCompressedArrayTexture ) {
+
+				textures.setTexture2DArray( dstTexture, 0 );
+				glTarget = _gl.TEXTURE_2D_ARRAY;
+
+			} else {
+
+				textures.setTexture2D( dstTexture, 0 );
+				glTarget = _gl.TEXTURE_2D;
+
+			}
+
+			state.activeTexture( _gl.TEXTURE0 ); // see #33153
+
+			state.pixelStorei( _gl.UNPACK_FLIP_Y_WEBGL, dstTexture.flipY );
+			state.pixelStorei( _gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, dstTexture.premultiplyAlpha );
+			state.pixelStorei( _gl.UNPACK_ALIGNMENT, dstTexture.unpackAlignment );
+
+			// used for copying data from cpu
+			const currentUnpackRowLen = state.getParameter( _gl.UNPACK_ROW_LENGTH );
+			const currentUnpackImageHeight = state.getParameter( _gl.UNPACK_IMAGE_HEIGHT );
+			const currentUnpackSkipPixels = state.getParameter( _gl.UNPACK_SKIP_PIXELS );
+			const currentUnpackSkipRows = state.getParameter( _gl.UNPACK_SKIP_ROWS );
+			const currentUnpackSkipImages = state.getParameter( _gl.UNPACK_SKIP_IMAGES );
+
+			state.pixelStorei( _gl.UNPACK_ROW_LENGTH, image.width );
+			state.pixelStorei( _gl.UNPACK_IMAGE_HEIGHT, image.height );
+			state.pixelStorei( _gl.UNPACK_SKIP_PIXELS, minX );
+			state.pixelStorei( _gl.UNPACK_SKIP_ROWS, minY );
+			state.pixelStorei( _gl.UNPACK_SKIP_IMAGES, minZ );
+
+			// set up the src texture
+			const isSrc3D = srcTexture.isDataArrayTexture || srcTexture.isData3DTexture;
+			const isDst3D = dstTexture.isDataArrayTexture || dstTexture.isData3DTexture;
+			if ( srcTexture.isDepthTexture ) {
+
+				const srcTextureProperties = properties.get( srcTexture );
+				const dstTextureProperties = properties.get( dstTexture );
+				const srcRenderTargetProperties = properties.get( srcTextureProperties.__renderTarget );
+				const dstRenderTargetProperties = properties.get( dstTextureProperties.__renderTarget );
+				state.bindFramebuffer( _gl.READ_FRAMEBUFFER, srcRenderTargetProperties.__webglFramebuffer );
+				state.bindFramebuffer( _gl.DRAW_FRAMEBUFFER, dstRenderTargetProperties.__webglFramebuffer );
+
+				for ( let i = 0; i < depth; i ++ ) {
+
+					// if the source or destination are a 3d target then a layer needs to be bound
+					if ( isSrc3D ) {
+
+						_gl.framebufferTextureLayer( _gl.READ_FRAMEBUFFER, _gl.COLOR_ATTACHMENT0, properties.get( srcTexture ).__webglTexture, srcLevel, minZ + i );
+						_gl.framebufferTextureLayer( _gl.DRAW_FRAMEBUFFER, _gl.COLOR_ATTACHMENT0, properties.get( dstTexture ).__webglTexture, dstLevel, dstZ + i );
+
+					}
+
+					_gl.blitFramebuffer( minX, minY, width, height, dstX, dstY, width, height, _gl.DEPTH_BUFFER_BIT, _gl.NEAREST );
+
+				}
+
+				state.bindFramebuffer( _gl.READ_FRAMEBUFFER, null );
+				state.bindFramebuffer( _gl.DRAW_FRAMEBUFFER, null );
+
+			} else if ( srcLevel !== 0 || srcTexture.isRenderTargetTexture || properties.has( srcTexture ) ) {
+
+				// get the appropriate frame buffers
+				const srcTextureProperties = properties.get( srcTexture );
+				const dstTextureProperties = properties.get( dstTexture );
+
+				// bind the frame buffer targets
+				state.bindFramebuffer( _gl.READ_FRAMEBUFFER, _srcFramebuffer );
+				state.bindFramebuffer( _gl.DRAW_FRAMEBUFFER, _dstFramebuffer );
+
+				for ( let i = 0; i < depth; i ++ ) {
+
+					// assign the correct layers and mip maps to the frame buffers
+					if ( isSrc3D ) {
+
+						_gl.framebufferTextureLayer( _gl.READ_FRAMEBUFFER, _gl.COLOR_ATTACHMENT0, srcTextureProperties.__webglTexture, srcLevel, minZ + i );
+
+					} else {
+
+						_gl.framebufferTexture2D( _gl.READ_FRAMEBUFFER, _gl.COLOR_ATTACHMENT0, _gl.TEXTURE_2D, srcTextureProperties.__webglTexture, srcLevel );
+
+					}
+
+					if ( isDst3D ) {
+
+						_gl.framebufferTextureLayer( _gl.DRAW_FRAMEBUFFER, _gl.COLOR_ATTACHMENT0, dstTextureProperties.__webglTexture, dstLevel, dstZ + i );
+
+					} else {
+
+						_gl.framebufferTexture2D( _gl.DRAW_FRAMEBUFFER, _gl.COLOR_ATTACHMENT0, _gl.TEXTURE_2D, dstTextureProperties.__webglTexture, dstLevel );
+
+					}
+
+					// copy the data using the fastest function that can achieve the copy
+					if ( srcLevel !== 0 ) {
+
+						_gl.blitFramebuffer( minX, minY, width, height, dstX, dstY, width, height, _gl.COLOR_BUFFER_BIT, _gl.NEAREST );
+
+					} else if ( isDst3D ) {
+
+						_gl.copyTexSubImage3D( glTarget, dstLevel, dstX, dstY, dstZ + i, minX, minY, width, height );
+
+					} else {
+
+						_gl.copyTexSubImage2D( glTarget, dstLevel, dstX, dstY, minX, minY, width, height );
+
+					}
+
+				}
+
+				// unbind read, draw buffers
+				state.bindFramebuffer( _gl.READ_FRAMEBUFFER, null );
+				state.bindFramebuffer( _gl.DRAW_FRAMEBUFFER, null );
+
+			} else {
+
+				if ( isDst3D ) {
+
+					// copy data into the 3d texture
+					if ( srcTexture.isDataTexture || srcTexture.isData3DTexture ) {
+
+						_gl.texSubImage3D( glTarget, dstLevel, dstX, dstY, dstZ, width, height, depth, glFormat, glType, image.data );
+
+					} else if ( dstTexture.isCompressedArrayTexture ) {
+
+						_gl.compressedTexSubImage3D( glTarget, dstLevel, dstX, dstY, dstZ, width, height, depth, glFormat, image.data );
+
+					} else {
+
+						_gl.texSubImage3D( glTarget, dstLevel, dstX, dstY, dstZ, width, height, depth, glFormat, glType, image );
+
+					}
+
+				} else {
+
+					// copy data into the 2d texture
+					if ( srcTexture.isDataTexture ) {
+
+						_gl.texSubImage2D( _gl.TEXTURE_2D, dstLevel, dstX, dstY, width, height, glFormat, glType, image.data );
+
+					} else if ( srcTexture.isCompressedTexture ) {
+
+						_gl.compressedTexSubImage2D( _gl.TEXTURE_2D, dstLevel, dstX, dstY, image.width, image.height, glFormat, image.data );
+
+					} else {
+
+						_gl.texSubImage2D( _gl.TEXTURE_2D, dstLevel, dstX, dstY, width, height, glFormat, glType, image );
+
+					}
+
+				}
+
+			}
+
+			// reset values
+			state.pixelStorei( _gl.UNPACK_ROW_LENGTH, currentUnpackRowLen );
+			state.pixelStorei( _gl.UNPACK_IMAGE_HEIGHT, currentUnpackImageHeight );
+			state.pixelStorei( _gl.UNPACK_SKIP_PIXELS, currentUnpackSkipPixels );
+			state.pixelStorei( _gl.UNPACK_SKIP_ROWS, currentUnpackSkipRows );
+			state.pixelStorei( _gl.UNPACK_SKIP_IMAGES, currentUnpackSkipImages );
+
+			// Generate mipmaps only when copying level 0
+			if ( dstLevel === 0 && dstTexture.generateMipmaps ) {
+
+				_gl.generateMipmap( glTarget );
+
+			}
+
+			state.unbindTexture();
+
+		};
+
+		/**
+		 * Initializes the given WebGLRenderTarget memory. Useful for initializing a render target so data
+		 * can be copied into it using {@link WebGLRenderer#copyTextureToTexture} before it has been
+		 * rendered to.
+		 *
+		 * @param {WebGLRenderTarget} target - The render target.
+		 */
+		this.initRenderTarget = function ( target ) {
+
+			if ( properties.get( target ).__webglFramebuffer === undefined ) {
+
+				textures.setupRenderTarget( target );
+
+			}
+
+		};
+
+		/**
+		 * Initializes the given texture. Useful for preloading a texture rather than waiting until first
+		 * render (which can cause noticeable lags due to decode and GPU upload overhead).
+		 *
+		 * @param {Texture} texture - The texture.
+		 */
+		this.initTexture = function ( texture ) {
+
+			if ( texture.isCubeTexture ) {
+
+				textures.setTextureCube( texture, 0 );
+
+			} else if ( texture.isData3DTexture ) {
+
+				textures.setTexture3D( texture, 0 );
+
+			} else if ( texture.isDataArrayTexture || texture.isCompressedArrayTexture ) {
+
+				textures.setTexture2DArray( texture, 0 );
+
+			} else {
+
+				textures.setTexture2D( texture, 0 );
+
+			}
+
+			state.unbindTexture();
+
+		};
+
+		/**
+		 * Can be used to reset the internal WebGL state. This method is mostly
+		 * relevant for applications which share a single WebGL context across
+		 * multiple WebGL libraries.
+		 */
+		this.resetState = function () {
+
+			_currentActiveCubeFace = 0;
+			_currentActiveMipmapLevel = 0;
+			_currentRenderTarget = null;
+
+			state.reset();
+			bindingStates.reset();
+
+		};
+
+		if ( typeof __THREE_DEVTOOLS__ !== 'undefined' ) {
+
+			__THREE_DEVTOOLS__.dispatchEvent( new CustomEvent( 'observe', { detail: this } ) );
+
+		}
+
+	}
+
+	/**
+	 * Defines the coordinate system of the renderer.
+	 *
+	 * In `WebGLRenderer`, the value is always `WebGLCoordinateSystem`.
+	 *
+	 * @type {WebGLCoordinateSystem|WebGPUCoordinateSystem}
+	 * @default WebGLCoordinateSystem
+	 * @readonly
+	 */
+	get coordinateSystem() {
+
+		return WebGLCoordinateSystem;
+
+	}
+
+	/**
+	 * Defines the output color space of the renderer.
+	 *
+	 * @type {SRGBColorSpace|LinearSRGBColorSpace}
+	 * @default SRGBColorSpace
+	 */
+	get outputColorSpace() {
+
+		return this._outputColorSpace;
+
+	}
+
+	set outputColorSpace( colorSpace ) {
+
+		this._outputColorSpace = colorSpace;
+
+		const gl = this.getContext();
+		gl.drawingBufferColorSpace = ColorManagement._getDrawingBufferColorSpace( colorSpace );
+		gl.unpackColorSpace = ColorManagement._getUnpackColorSpace();
+
+	}
+
+}
+
+export { ACESFilmicToneMapping, AddEquation, AddOperation, AdditiveBlending, AgXToneMapping, AlphaFormat, AlwaysCompare, AlwaysDepth, ArrayCamera, BackSide, BoxGeometry, BufferAttribute, BufferGeometry, ByteType, CineonToneMapping, ClampToEdgeWrapping, Color, ColorManagement, ConstantAlphaFactor, ConstantColorFactor, CubeCamera, CubeDepthTexture, CubeReflectionMapping, CubeRefractionMapping, CubeTexture, CubeUVReflectionMapping, CullFaceBack, CullFaceFront, CullFaceNone, CustomBlending, CustomToneMapping, Data3DTexture, DataArrayTexture, DataTexture, DepthFormat, DepthStencilFormat, DepthTexture, DoubleSide, DstAlphaFactor, DstColorFactor, EqualCompare, EqualDepth, EquirectangularReflectionMapping, EquirectangularRefractionMapping, EventDispatcher, ExternalTexture, Float32BufferAttribute, FloatType, FrontSide, Frustum, GLSL3, GreaterCompare, GreaterDepth, GreaterEqualCompare, GreaterEqualDepth, HalfFloatType, IntType, Layers, LessCompare, LessDepth, LessEqualCompare, LessEqualDepth, LinearFilter, LinearMipmapLinearFilter, LinearMipmapNearestFilter, LinearSRGBColorSpace, LinearToneMapping, LinearTransfer, Matrix3, Matrix4, MaxEquation, Mesh, MeshBasicMaterial, MeshDepthMaterial, MeshDistanceMaterial, MinEquation, MirroredRepeatWrapping, MixOperation, MultiplyBlending, MultiplyOperation, NearestFilter, NearestMipmapLinearFilter, NearestMipmapNearestFilter, NeutralToneMapping, NeverCompare, NeverDepth, NoBlending, NoColorSpace, NoToneMapping, NormalBlending, NotEqualCompare, NotEqualDepth, ObjectSpaceNormalMap, OneFactor, OneMinusConstantAlphaFactor, OneMinusConstantColorFactor, OneMinusDstAlphaFactor, OneMinusDstColorFactor, OneMinusSrcAlphaFactor, OneMinusSrcColorFactor, OrthographicCamera, PCFShadowMap, PCFSoftShadowMap, PMREMGenerator, PerspectiveCamera, Plane, PlaneGeometry, R11_EAC_Format, RED_GREEN_RGTC2_Format, RED_RGTC1_Format, REVISION, RG11_EAC_Format, RGBAFormat, RGBAIntegerFormat, RGBA_ASTC_10x10_Format, RGBA_ASTC_10x5_Format, RGBA_ASTC_10x6_Format, RGBA_ASTC_10x8_Format, RGBA_ASTC_12x10_Format, RGBA_ASTC_12x12_Format, RGBA_ASTC_4x4_Format, RGBA_ASTC_5x4_Format, RGBA_ASTC_5x5_Format, RGBA_ASTC_6x5_Format, RGBA_ASTC_6x6_Format, RGBA_ASTC_8x5_Format, RGBA_ASTC_8x6_Format, RGBA_ASTC_8x8_Format, RGBA_BPTC_Format, RGBA_ETC2_EAC_Format, RGBA_PVRTC_2BPPV1_Format, RGBA_PVRTC_4BPPV1_Format, RGBA_S3TC_DXT1_Format, RGBA_S3TC_DXT3_Format, RGBA_S3TC_DXT5_Format, RGBFormat, RGB_BPTC_SIGNED_Format, RGB_BPTC_UNSIGNED_Format, RGB_ETC1_Format, RGB_ETC2_Format, RGB_PVRTC_2BPPV1_Format, RGB_PVRTC_4BPPV1_Format, RGB_S3TC_DXT1_Format, RGFormat, RGIntegerFormat, RawShaderMaterial, RedFormat, RedIntegerFormat, ReinhardToneMapping, RepeatWrapping, ReverseSubtractEquation, SIGNED_R11_EAC_Format, SIGNED_RED_GREEN_RGTC2_Format, SIGNED_RED_RGTC1_Format, SIGNED_RG11_EAC_Format, SRGBColorSpace, SRGBTransfer, ShaderChunk, ShaderLib, ShaderMaterial, ShortType, SrcAlphaFactor, SrcAlphaSaturateFactor, SrcColorFactor, SubtractEquation, SubtractiveBlending, TangentSpaceNormalMap, Texture, Uint16BufferAttribute, Uint32BufferAttribute, UniformsLib, UniformsUtils, UnsignedByteType, UnsignedInt101111Type, UnsignedInt248Type, UnsignedInt5999Type, UnsignedIntType, UnsignedShort4444Type, UnsignedShort5551Type, UnsignedShortType, VSMShadowMap, Vector2, Vector3, Vector4, WebGLCoordinateSystem, WebGLCubeRenderTarget, WebGLRenderTarget, WebGLRenderer, WebGLUtils, WebXRController, ZeroFactor, createCanvasElement, error, log, warn, warnOnce };

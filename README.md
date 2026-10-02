@@ -81,4 +81,4 @@ The repository includes all runtime source, models, music and engine code. Seven
 
 [Open YourWar](https://yourwar-battle-forge.dingikang.chatgpt.site) (the owner-private hosted Site requires the owner’s access).
 
-This source snapshot matches Site commit `4f368886b68b6f8a45a0fe5ce26cdce1db65b713`; repository-only changes add lossless source packaging and verification instructions.
+This source snapshot matches Site commit `243a4e3af84917d66af3101b2323f287fca0ace5`; repository-only changes add lossless source packaging and verification instructions.

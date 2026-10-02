@@ -1,0 +1,180 @@
+{
+  "version": 1,
+  "description": "Lossless source asset fragments; npm scripts automatically restore original runtime files.",
+  "assets": [
+    {
+      "path": "dist/assets/audio/battle.mp3",
+      "bytes": 959626,
+      "sha256": "6d1b63ccfcf4ec2aeaf32c4dbef069355b430145291e458775a15e38ac2073a9",
+      "parts": [
+        {
+          "path": "assets/source/dist/assets/audio/battle.mp3.part000",
+          "bytes": 307200,
+          "sha256": "1e628a28699cc70d5e56a10b6ffc1db7462bdcfd6e56b149bec6825b69864b4c"
+        },
+        {
+          "path": "assets/source/dist/assets/audio/battle.mp3.part001",
+          "bytes": 307200,
+          "sha256": "b70e4adeeb4ac8ad8b8559f6d0e673b31c586dffac75ce77098d2fd1c4ac435d"
+        },
+        {
+          "path": "assets/source/dist/assets/audio/battle.mp3.part002",
+          "bytes": 307200,
+          "sha256": "98443f4ea0f716316aa8dbb300ca1e912da5dfa157dc5b31ace8a469a263d79b"
+        },
+        {
+          "path": "assets/source/dist/assets/audio/battle.mp3.part003",
+          "bytes": 38026,
+          "sha256": "ce06f01c9c0cc90aa84a066e46cb58cb17b1218cc0e40d5860e9d44db6d4c490"
+        }
+      ]
+    },
+    {
+      "path": "dist/assets/models/Barbarian.glb",
+      "bytes": 919928,
+      "sha256": "39eba151844cc3bbb5de6fe2cc3c3052fed8deadadbc47de2b8cf27d2cbf291b",
+      "parts": [
+        {
+          "path": "assets/source/dist/assets/models/Barbarian.glb.part000",
+          "bytes": 307200,
+          "sha256": "dcc46b9c4e0a5e6b9d48ba7e48604861049af4cb3784f3073f03c0b7d96780bd"
+        },
+        {
+          "path": "assets/source/dist/assets/models/Barbarian.glb.part001",
+          "bytes": 307200,
+          "sha256": "b5be9ceb45334056c46b33a8d93bed5a2e6a7c63261a91bd2d6b929310d488d4"
+        },
+        {
+          "path": "assets/source/dist/assets/models/Barbarian.glb.part002",
+          "bytes": 305528,
+          "sha256": "0342ea06daa9a9c4ca2b6cddb3c242ab718c75343ed8646fb98d4641c1cec116"
+        }
+      ]
+    },
+    {
+      "path": "dist/assets/models/Knight.glb",
+      "bytes": 965860,
+      "sha256": "8ea81c36d4a2f33e37e44cd01e4d7d9e5912f20e5dbb9b5c1dc579f9b38c58f1",
+      "parts": [
+        {
+          "path": "assets/source/dist/assets/models/Knight.glb.part000",
+          "bytes": 307200,
+          "sha256": "ee337687b1389deb6d31d17e1ff0d6ff9d55fde835721c2f3eb465f0501ba064"
+        },
+        {
+          "path": "assets/source/dist/assets/models/Knight.glb.part001",
+          "bytes": 307200,
+          "sha256": "c7cc398fb42d4a25bc85dddcaf887f96d852ab927ab23e62a6afe695931068b3"
+        },
+        {
+          "path": "assets/source/dist/assets/models/Knight.glb.part002",
+          "bytes": 307200,
+          "sha256": "2506c7f72645e54fcfe6f0f2c1f8c00b43133acb8cbe4a604b70a1f788a7f06b"
+        },
+        {
+          "path": "assets/source/dist/assets/models/Knight.glb.part003",
+          "bytes": 44260,
+          "sha256": "790f9519e725959cc29658e97d23fa302f77e8b69dccc85df269f1b75d2cd158"
+        }
+      ]
+    },
+    {
+      "path": "dist/assets/models/Mage.glb",
+      "bytes": 896320,
+      "sha256": "fb5d7ac73358505bebbbb1b29a31fd37267fdf29f89cf048b35b13eac8d379a0",
+      "parts": [
+        {
+          "path": "assets/source/dist/assets/models/Mage.glb.part000",
+          "bytes": 307200,
+          "sha256": "957e68d5f2ed44d406bd809b7f6883a9f8e0de5191dcdb9174cf7156f59e9d7f"
+        },
+        {
+          "path": "assets/source/dist/assets/models/Mage.glb.part001",
+          "bytes": 307200,
+          "sha256": "6e0e45929d5fb2c64dbd2b9ae5d785c608d61aa97e14e7f749cb2d758a647f07"
+        },
+        {
+          "path": "assets/source/dist/assets/models/Mage.glb.part002",
+          "bytes": 281920,
+          "sha256": "25a1a6141fea62fe23a927331b4357e4686e903ba8b8bcee0386c0b1c5cd158a"
+        }
+      ]
+    },
+    {
+      "path": "dist/assets/models/Rogue_Hooded.glb",
+      "bytes": 904488,
+      "sha256": "e67122ea15866900f51c245b8853e6742417a16b40ca69117eb883debf0621e5",
+      "parts": [
+        {
+          "path": "assets/source/dist/assets/models/Rogue_Hooded.glb.part000",
+          "bytes": 307200,
+          "sha256": "dcc77b0cb38ab9dac2297f9036355aabc3efe765fcaaa2d474cc7a6f2e075614"
+        },
+        {
+          "path": "assets/source/dist/assets/models/Rogue_Hooded.glb.part001",
+          "bytes": 307200,
+          "sha256": "5fae3316b76691c8465a151e5fcfd97a9a87ee8662587c664e96f852bca996d8"
+        },
+        {
+          "path": "assets/source/dist/assets/models/Rogue_Hooded.glb.part002",
+          "bytes": 290088,
+          "sha256": "08dd7493d97ca98184250aba9d5d4af5da08ee5d4526b5c7d5ef40f341d5acbc"
+        }
+      ]
+    },
+    {
+      "path": "dist/assets/vendor/three.core.js",
+      "bytes": 1458113,
+      "sha256": "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6",
+      "parts": [
+        {
+          "path": "assets/source/dist/assets/vendor/three.core.js.part000",
+          "bytes": 307200,
+          "sha256": "c7d70fd8341dbfaf8eedd088fce4c650bbb482a5210822adfae82b6bc62d5122"
+        },
+        {
+          "path": "assets/source/dist/assets/vendor/three.core.js.part001",
+          "bytes": 307200,
+          "sha256": "0a31782bde0fade46b10cd89c79593b9971150e1370b9fa64f07fa3b1a4db205"
+        },
+        {
+          "path": "assets/source/dist/assets/vendor/three.core.js.part002",
+          "bytes": 307200,
+          "sha256": "633920af737cd89c406ef52e20f56698230489251bf45356bb0a1b03cd4063c7"
+        },
+        {
+          "path": "assets/source/dist/assets/vendor/three.core.js.part003",
+          "bytes": 307200,
+          "sha256": "3b008dcff4c7ebe3d8c49a1fbfdb4664c8325524d4c932c1e8dd1411f50ef637"
+        },
+        {
+          "path": "assets/source/dist/assets/vendor/three.core.js.part004",
+          "bytes": 229313,
+          "sha256": "e90cce07a6374a475b3e9774cda41e8b1eaa86081dc28a09934f231197096e9f"
+        }
+      ]
+    },
+    {
+      "path": "dist/assets/vendor/three.module.js",
+      "bytes": 662772,
+      "sha256": "9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea",
+      "parts": [
+        {
+          "path": "assets/source/dist/assets/vendor/three.module.js.part000",
+          "bytes": 307200,
+          "sha256": "ebe0d1eaea5e0be443623792de913fc95c7958d2e4828e889d74d4e08368d2a0"
+        },
+        {
+          "path": "assets/source/dist/assets/vendor/three.module.js.part001",
+          "bytes": 307200,
+          "sha256": "93931a76c0c34d5460370e7337e840a4704a7ca6a899b4eae225566bd07b5ef5"
+        },
+        {
+          "path": "assets/source/dist/assets/vendor/three.module.js.part002",
+          "bytes": 48372,
+          "sha256": "4a47120b1d157f0349e98a483e4ba7600e8a9cd0968f4dba07fd7a16b7bf8649"
+        }
+      ]
+    }
+  ]
+}

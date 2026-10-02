@@ -1,0 +1,18 @@
+{
+  "name": "yourwar",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8080 --directory dist",
+    "test": "node tests/battle.test.mjs && node tests/assets.test.mjs",
+    "check": "node --check dist/game.mjs && node --check dist/battle.mjs",
+    "restore:assets": "node scripts/restore-assets.mjs",
+    "prestart": "node scripts/restore-assets.mjs",
+    "pretest": "node scripts/restore-assets.mjs",
+    "precheck": "node scripts/restore-assets.mjs",
+    "build": "npm run check",
+    "prebuild": "node scripts/restore-assets.mjs"
+  },
+  "description": "Original 3D formation battle simulator"
+}
