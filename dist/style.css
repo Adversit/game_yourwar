@@ -10,3 +10,8 @@
 
 /* Readability refinements for Chinese controls. */
 @media(min-width:801px){.unit-card strong{font-size:14px}.unit-card small{font-size:16px}.stage-panel p{font-size:14px}.unit-detail #unit-description{font-size:13px;line-height:1.75}.tool-actions button{font-size:13px}.counter{font-size:12px}.stat{font-size:12px}.detail-heading span{font-size:12px}.bottom-hint{font-size:11px}}
+
+/* Deployment stays reversible and usable on touch devices. */
+#undo-btn:disabled{opacity:.4;cursor:not-allowed}.unit-card.unaffordable{opacity:.55}.unit-card.unaffordable small{color:#e49c88}button:focus-visible,a:focus-visible{outline:2px solid #f1c66f;outline-offset:3px}.icon-btn,.camera-controls button,.tool-actions button,.battle-controls button{min-height:44px;min-width:44px}.unit-description,.counter,#stage-hint,.manual-note{font-size:.875rem;line-height:1.7}.unit-card strong{font-size:.875rem}.unit-card small{font-size:.8125rem}.deployment-panel{padding-bottom:env(safe-area-inset-bottom)}.modal-wrap>div{max-height:calc(100dvh - 32px);overflow:auto}
+@media(max-width:700px){.deploy-toolbar{flex-wrap:wrap;gap:8px}.tool-actions{gap:6px}.tool-actions button{padding:8px 10px;font-size:.8125rem}.unit-roster{scroll-snap-type:x proximity;overscroll-behavior-x:contain}.unit-card{scroll-snap-align:start;min-width:74px}.start-btn{min-height:46px}.budget{min-width:110px}.camera-controls{max-width:calc(100vw - 24px)}.stage-panel #stage-hint{font-size:.8125rem}.army-bar .army>span{font-size:.75rem}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

@@ -79,6 +79,12 @@ The repository includes all runtime source, models, music and engine code. Seven
 
 ## Hosted game
 
-[Open YourWar](https://yourwar-battle-forge.dingikang.chatgpt.site) (the owner-private hosted Site requires the owner’s access).
+[Open YourWar](https://yourwar-battle-forge.dingikang.chatgpt.site) (public hosted Site).
 
-This source snapshot matches Site commit `243a4e3af84917d66af3101b2323f287fca0ace5`; repository-only changes add lossless source packaging and verification instructions.
+This source snapshot matches Site commit `a51a004768ad3c3c9efef767f6dd8fd99298e64f`; repository-only changes add lossless source packaging and verification instructions.
+
+## 2026-10-09 playability update
+
+- Undo up to 30 deployment edits, including clear, preset and agent-assisted placement; Ctrl/Command+Z supported.
+- Unaffordable units show a budget hint. Help and sound settings pause an active battle.
+- Fixed a two-finger pinch being interpreted as a placement tap; larger touch controls and readable phone labels.
