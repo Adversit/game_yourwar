@@ -15,12 +15,21 @@ export const STAGES=[
  {name:'第三战 · 钢铁壁垒',subtitle:'密集盾阵，试试爆炸与穿甲长枪',budget:1900,enemy:[['guardian',8],['pikeman',4]],starter:[['guardian',3],['bomber',3],['pikeman',4],['healer',1]]},
  {name:'第四战 · 巨人的脚步',subtitle:'长枪对巨人有额外伤害，别挤在一起',budget:2200,enemy:[['giant',2],['swordsman',6],['healer',2]],starter:[['pikeman',10],['guardian',3],['archer',3],['healer',1]]},
  {name:'第五战 · 烈焰突袭',subtitle:'狂战士冲阵，远近协作守住防线',budget:2800,enemy:[['berserker',7],['bomber',4],['guardian',4]],starter:[['guardian',6],['archer',6],['giant',1],['bomber',2]]},
- {name:'终战 · 你的战争',subtitle:'一支完整军团。让每枚金币发挥作用',budget:3800,enemy:[['giant',2],['guardian',5],['archer',7],['bomber',3],['healer',3]],starter:[['giant',1],['guardian',5],['pikeman',7],['archer',5],['bomber',3],['healer',1]]}
+ {name:'第六战 · 你的战争',subtitle:'一支完整军团。让每枚金币发挥作用',budget:3800,enemy:[['giant',2],['guardian',5],['archer',7],['bomber',3],['healer',3]],starter:[['giant',1],['guardian',5],['pikeman',7],['archer',5],['bomber',3],['healer',1]]},
+ {name:'第七战 · 星火攻城',subtitle:'敌方重甲护住爆破手，分散阵线再突破',budget:4100,enemy:[['guardian',8],['bomber',6],['healer',3]],starter:[['guardian',4],['berserker',7],['archer',5],['bomber',3],['healer',2]]},
+ {name:'第八战 · 远弓风暴',subtitle:'不要让长枪单独承受箭雨；盾卫护住后排',budget:4300,enemy:[['guardian',6],['archer',12],['berserker',5]],starter:[['guardian',8],['giant',1],['bomber',4],['healer',3],['archer',6]]},
+ {name:'终战 · 双翼合围',subtitle:'重装与远程并进，保存预案反复比较阵容',budget:4800,enemy:[['giant',3],['pikeman',7],['archer',6],['healer',4]],starter:[['guardian',6],['pikeman',12],['archer',8],['bomber',3],['healer',3]]}
 ];
 export const ARENA={minX:-16,maxX:16,minZ:-10,maxZ:10};
 export function costOf(placements,team){return placements.filter(p=>p.team===team).reduce((n,p)=>n+TYPES[p.type].cost,0)}
 export function formation(list,team){let out=[],i=0;for(const [type,count] of list){for(let k=0;k<count;k++){const ranged=['archer','bomber','healer'].includes(type);const col=Math.floor(k/7),row=k%7;out.push({type,team,x:(team===0?-1:1)*(ranged?10+col*1.4:5+col*1.8),z:(row-(Math.min(count,7)-1)/2)*1.55+(i%2)*.15});}i++;}return out;}
 export function validPlacement(p,placements,budget=Infinity){if(!TYPES[p.type]||![0,1].includes(p.team))return {ok:false,reason:'未知兵种或阵营'};if(!Number.isFinite(p.x)||!Number.isFinite(p.z))return {ok:false,reason:'无效位置'};if(Math.abs(p.x)>15||Math.abs(p.z)>9||p.team===0&&p.x>-.7||p.team===1&&p.x<.7)return {ok:false,reason:'请在己方半场布阵'};if(placements.filter(q=>q.team===p.team).length>=80)return {ok:false,reason:'每方最多 80 个单位'};if(costOf(placements,p.team)+TYPES[p.type].cost>budget)return {ok:false,reason:'预算不足，换一个兵种或移除单位'};if(placements.some(q=>Math.hypot(q.x-p.x,q.z-p.z)<(TYPES[p.type].radius+TYPES[q.type].radius)*.94))return {ok:false,reason:'此处太拥挤，稍微拉开一点'};return {ok:true};}
+export function loadFormationPlan(plan,team,existing,budget=Infinity){
+ if(!Array.isArray(plan)||!plan.length||plan.length>80)return {ok:false,reason:'预案为空或人数超过上限'};
+ const units=[],others=existing.filter(p=>p.team!==team);
+ for(const source of plan){if(!source||typeof source!=='object')return {ok:false,reason:'预案格式无效'};const p={type:source.type,team,x:Math.abs(source.x)*(team===0?-1:1),z:source.z};const result=validPlacement(p,[...others,...units],budget);if(!result.ok)return result;units.push(p)}
+ return {ok:true,placements:[...others,...units]};
+}
 export class Battle{
  constructor(placements,seed=42){this.time=0;this.rng=seed>>>0;this.events=[];this.projectiles=[];this.winner=null;this.units=placements.map((p,i)=>({...p,id:i,...TYPES[p.type],maxHp:TYPES[p.type].hp,cooldown:(i%7)*.08,alive:true,vx:0,vz:0,angle:p.team===0?Math.PI/2:-Math.PI/2,attackAnim:0,hit:0,charge:true,walk:0,kills:0}));this.nextProjectile=0;}
  random(){this.rng=(1664525*this.rng+1013904223)>>>0;return this.rng/4294967296;}

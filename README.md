@@ -88,3 +88,8 @@ This source snapshot matches Site commit `a51a004768ad3c3c9efef767f6dd8fd99298e6
 - Undo up to 30 deployment edits, including clear, preset and agent-assisted placement; Ctrl/Command+Z supported.
 - Unaffordable units show a budget hint. Help and sound settings pause an active battle.
 - Fixed a two-finger pinch being interpreted as a placement tap; larger touch controls and readable phone labels.
+
+
+## 2026-10-09 玩法扩展
+
+战术挑战扩展至九关；新增三套本机编队预案，可跨关卡调用、在红蓝阵营间镜像，并重新校验预算、碰撞、人数与边界。调用是原子操作且支持撤销。
